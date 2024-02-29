@@ -1,0 +1,133 @@
+---
+title: "Homework 5"
+author:
+- Isaiah Benny
+- "EID: ieb357"
+date: "2024-02-28"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(fig.height=3, fig.width=5, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=60), echo = FALSE, message = FALSE, fig.align = 'center')
+```
+
+```{r}
+library(tidyverse)
+library(knitr)
+```
+
+# [Github](https://github.com/isaiahbenny/SDS315-HW5)
+
+---
+
+# Question 1
+
+Our null hypothesis is that Iron Bank employees have their trades flagged with a rate of 2.4% on average in the long run. Our test statistic is the number of flagged trades out of 2021 trades.
+
+```{r}
+# simulate probability distribution
+sim_trades <- rbinom(n=100000, size=2021, prob=.024)
+
+# plot the data
+ggplot(mapping = aes(sim_trades)) + geom_histogram(col="black", fill="lightblue") + xlab("Number of Flagged Trades out of 2021")
+
+# calculate the p-value
+pvalue_trade <- sum(sim_trades >= 70) / length(sim_trades)
+```
+
+The histogram above shows the probability distribution of the test statistic, assuming that the null hypothesis is true. Our p-value is `r pvalue_trade`. In other words, assuming that the null hypothesis is true, the probability of seeing 70 or more flagged trades out of 2021 is `r pvalue_trade`. Because this p-value is decently below 0.05, it is not very plausible for the null hypothesis to be true; 70 flagged trades out of 2021 would be fairly rare, so it is certainly possible that Iron Bank employees are having their trades flagged at a higher rate.
+
+
+\newpage
+
+# Question 2
+
+Our null hypothesis is that 3% of Gourmet Bites inspections result in health code violations on average in the long run. Our test statistic will be the number of health inspections that result in a reported health code violation out of 50.
+
+```{r}
+# simulate the probability distribution
+sim_inspections <- rbinom(n=100000, size=50, prob=.03)
+
+# plot the distribution
+ggplot(mapping = aes(sim_inspections)) + geom_histogram(binwidth = 1, boundary=0, col="black", fill="lightblue") + xlab("Number of Health Inspections with Violations\nout of 50")
+
+#calculate the p-value
+pvalue_health <- (sum(sim_inspections >= 8) / length(sim_inspections)) %>% format(scientific=F)
+```
+
+This histogram shows the probability distribution of the test statistic, assuming that the null hypothesis is true. Our p-value is `r pvalue_health`. Since this p-value is far below 0.05, it would be very rare to observe a count of 8 health code violations if we assume that Gourmet Bites has health code violations at a rate of 3%, meaning that the null does not seem to be plausible. 
+
+\newpage
+
+# Question 3
+
+## Part A
+
+```{r}
+# read the text
+text <- readLines("brown_sentences.txt")
+
+# get the previously established letter frequency
+letter_frequencies = read.csv("letter_frequencies.csv")
+
+
+calculate_chi_squared = function(sentence, freq_table) {
+  
+  # Ensure letter frequencies are normalized and sum to 1
+  freq_table$Probability = freq_table$Probability / sum(freq_table$Probability)
+  
+  # Remove non-letters and convert to uppercase
+  clean_sentence = gsub("[^A-Za-z]", "", sentence)
+  clean_sentence = toupper(clean_sentence)
+  
+  # Count the occurrences of each letter in the sentence
+  observed_counts = table(factor(strsplit(clean_sentence, "")[[1]], levels = freq_table$Letter))
+  
+  # Calculate expected counts
+  total_letters = sum(observed_counts)
+  expected_counts = total_letters * freq_table$Probability
+  
+  # Chi-squared statistic
+  chi_squared_stat = sum((observed_counts - expected_counts)^2 / expected_counts)
+  
+  return(chi_squared_stat)
+}
+
+
+chi_squared_brown <- numeric()
+
+# for each sentence, calculate a chi-squared value
+for (i in 1:length(text)){
+  chi_squared_brown <- append(chi_squared_brown, calculate_chi_squared(text[i], letter_frequencies))
+}
+
+# plot the distribution of chi-squared values
+ggplot(mapping = aes(chi_squared_brown)) + geom_histogram(col="black", fill="lightblue") + xlab("Chi-Squared") + ggtitle("Null Distribution")
+```
+
+This histogram shows the distribution of chi-squared values for normal English sentences based on our defined letter frequencies.
+
+## Part B
+```{r}
+test_sentences <- c("She opened the book and started to read the first chapter, eagerly anticipating what might come next.", "Despite the heavy rain, they decided to go for a long walk in the park, crossing the main avenue by the fountain in the center.", "The museum’s new exhibit features ancient artifacts from various civilizations around the world.", "He carefully examined the document, looking for any clues that might help solve the mystery.", "The students gathered in the auditorium to listen to the guest speaker’s inspiring lecture.", "Feeling vexed after an arduous and zany day at work, she hoped for a peaceful and quiet evening at home, cozying up after a quick dinner with some TV, or maybe a book on her upcoming visit to Auckland.", "The chef demonstrated how to prepare a delicious meal using only locally sourced ingredients, focusing mainly on some excellent dinner recipes from Spain.", "They watched the sunset from the hilltop, marveling at the beautiful array of colors in the sky.", "The committee reviewed the proposal and provided many points of useful feedback to improve the project’s effectiveness.", "Despite the challenges faced during the project, the team worked tirelessly to ensure its successful completion, resulting in a product that exceeded everyone’s expectations.")
+
+pvalues_sentences <- numeric()
+
+# calculate chi-squared and p-values for each sentence
+for (i in 1:length(test_sentences)) {
+  chi_squared <- calculate_chi_squared(test_sentences[i], letter_frequencies)
+  
+  pvalue <- sum(chi_squared_brown >= chi_squared) / length(chi_squared_brown)
+  
+  pvalues_sentences[i] <- pvalue
+}
+
+row_names <- paste("Sentence", 1:10)
+
+# Put the p-values into a table
+data.frame(row_names, pvalues_sentences %>% round(3), row.names = 1) %>% kable(col.names = "P-Values")
+```
+
+The table above shows the chi-squared statistic based on letter frequencies for each sentence. Based on this table, it appears as if sentence 6 is the sentence that has been watermarked. I know this because the p-value associated with the chi-square statistic of that sentence is the lowest of all 10 by a decent amount, and it is also below 0.05.
